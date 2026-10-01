@@ -1,0 +1,42 @@
+{
+  "made_by": "tools/eval03_vm.py run on model A (autocal_uv_1600_1700) with --compare against notebook 03's own outputs; written as compare_with_03.json, renamed",
+  "reference": "run/results/autocal_uv_1600_1700_eval (notebook 03's own outputs for model A)",
+  "max_abs_diff": {
+    "fixed_alpha_train.csv": {
+      "alpha_1600A": 0.0,
+      "pred_best_1600A": 1.1599999999445387e-06,
+      "pred_last_1600A": 5.400000000488347e-07,
+      "alpha_1700A": 0.0,
+      "pred_best_1700A": 1.2999999999818712e-06,
+      "pred_last_1700A": 7.200000000096018e-07
+    },
+    "fixed_alpha_test.csv": {
+      "alpha_1600A": 0.0,
+      "pred_best_1600A": 1.09999999997612e-06,
+      "pred_last_1600A": 5.4999999998806e-07,
+      "alpha_1700A": 0.0,
+      "pred_best_1700A": 1.0000000000287557e-06,
+      "pred_last_1700A": 7.800000000335316e-07
+    },
+    "fixed_alpha_holdout.csv": {
+      "alpha_1600A": 0.0,
+      "pred_best_1600A": 1.1300000000158406e-06,
+      "pred_last_1600A": 4.900000000196414e-07,
+      "alpha_1700A": 0.0,
+      "pred_best_1700A": 9.699999999890352e-07,
+      "pred_last_1700A": 6.499999999909356e-07
+    },
+    "degradation_recovery.csv": {
+      "deg_cor_1600A": 0.0,
+      "pred_best_1600A": 8.999999999703689e-07,
+      "pred_last_1600A": 4.2000000000097515e-07,
+      "deg_cor_1700A": 0.0,
+      "pred_best_1700A": 1.09999999997612e-06,
+      "pred_last_1700A": 6.000000000172534e-07
+    },
+    "calibration_curve.csv": {
+      "mean_bias": 3.008171915999322e-07
+    }
+  },
+  "max_over_all_predictions": 1.2999999999818712e-06
+}
