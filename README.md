@@ -25,10 +25,3 @@ A small CNN that estimates the degradation of SDO/AIA's 1600 Å and 1700 Å chan
 
 - **Packages.** Python ≥ 3.10, torch, numpy, pandas, matplotlib.
 - **Data.** The tutorial reads 11 frame pairs, plus one per month with the local data, from `../run/data` when it exists, and otherwise the 11 from SDOML-v2 on AWS (needs `s3fs` and `numcodecs`). It plots the shipped curve either way. No image data are included.
-
-## Notes
-
-- **Where the tutorial was run.** It was executed here on CPU with the local data. Its AWS reader was tested only against a local Zarr store of the same layout; it has not been run against AWS from this machine.
-- **How the evaluation was run.** Model B was evaluated on CPU with `tools/eval03_vm.py`, a port of notebook 03 that reproduces 03's model-A outputs to within 1.3e-06.
-- **Regenerating.** See the report's §8.
-- **Sources.** The training and evaluation notebooks, and the data, stay in `../run/`.
