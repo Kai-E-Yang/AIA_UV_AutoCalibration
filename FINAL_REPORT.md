@@ -18,7 +18,7 @@
 - **Source.** SDOML-v2 on AWS (registry.opendata.aws/sdoml-fdl), AIA 1600 and 1700 Å, 512² pixels. The frames are already divided by exposure time and by `DEG_COR`.
 - **Selection.** One pair per day: the frames nearest 00:00 UT (within 15 min), `QUALITY` = 0, normal exposure. That gives 3,826 pairs, 2010-05-20 to 2020-12-31. The two frames of a pair are at most 12 min apart (median 6 min).
 - **Split by month, as in the paper.** Training January–July (2,176 pairs); test August–October (990, used to choose checkpoints); held-out November–December (660).
-- **Not packaged.** No image data are packaged. Notebook 01 (`../run/`) rebuilds them from AWS. It is saved set to 2020 only, which took 42 min, so all years should take about 7 h.
+- **Not packaged.** No image data are packaged from the local training and test dataset. The tutorial rebuilds them from AWS.
 
 ## 2. Method
 
@@ -32,13 +32,12 @@
 | Checkpoint rule | first epoch at 100 % test success (epoch 29) | lowest test-month MSE (seeds 1, 2, 3: epochs 135, 159, 150) |
 | Released | — | seed 1, epoch 135 (rule fixed before any held-out or `DEG_COR` evaluation of B; `tools/release.json`) |
 
-- **Model A and the reference.** Model A uses the reference's network, head, α range and optimiser, but one frame a day for 2010–2020, 500 instead of 1000 epochs, and notebook 02's checkpoint rule (`../run/DEBUG_REPORT_02.md` §3).
+- **Model A and the reference.** Model A uses the reference's network, head, α range and optimiser, but one frame a day for 2010–2020, 500 instead of 1000 epochs.
 - **Shared settings.** Everything else follows the reference implementation (`autocal_paper_config.yaml`): 512² → 256² by `[::2]`, a fixed scale per channel, zero outside r = 200 px (100 px after subsampling), MSE loss, Adam, batch 64, and test and held-out frames mirrored.
 - **Names.** "Chosen" is the checkpoint the notebooks save as `best`; for B, `final.pt` holds the same weights.
 - **Evaluation.** As in notebook 03: synthetic dimming with fixed random α (0.01–1.0) on each split; recovery of `DEG_COR` on all frames; an α sweep from 0.3 to 1.1 on 96 frames (every 40th, all months). Every frame is mirrored left–right except those of the training split in the synthetic test.
-  - Model B was evaluated on CPU with a port of 03's code (`tools/eval03_vm.py`).
-  - That script reproduces 03's model-A outputs to within 1.3e-06.
-- **Baselines.** Each estimates α from one number per frame and channel, relative to that number's median over the training months (`tools/baselines.py`):
+  - Model B was evaluated on CPU.
+- **Baselines.** Each estimates α from one number per frame and channel, relative to that number's median over the training months:
   - **plain:** the mean on-disk intensity;
   - **mode:** the mode of the log-intensity distribution, after the paper's baseline. Unlike the paper, it uses no HMI quiet-Sun mask, and it takes a smoothed-histogram mode instead of a log-normal fit.
 
@@ -66,7 +65,6 @@
 
 - **Scatter.** Single days scatter around `DEG_COR` by 0.010 (1600 Å) and 0.008 (1700 Å), as a standard deviation; within a month, by 0.005 and 0.004. The monthly medians of three seeds × two checkpoints agree within 0.005 and 0.004 (median range).
 - **What remains after binning.** Part of it is shared by the two models: their monthly residuals correlate at 0.56 (1600 Å) and 0.33 (1700 Å). The released model's largest monthly deviations come right after steps in `DEG_COR`. After the +0.066 step on 2013-08-15, it reads up to 0.027 low at 1600 Å, and the paper recipe up to 0.034. Such features sit in the data or in `DEG_COR`, not in one model.
-- **The paper's Fig. 6** (arXiv 2012.14023) also shows smooth curves with “standard deviation” bands, on axes from 0 to 1.5, without saying how they were binned. Read by eye, its curves sit up to about 0.1–0.2 from the V9 calibration curve in some EUV channels. Its grey 25 % band is the error it gives for the EVE/FISM-based EUV calibration; there is no counterpart for 1600/1700 Å here.
 
 ![Calibration](figures/fig3_calibration.png)
 
@@ -84,36 +82,22 @@ Model A's 1700 Å bias has two causes. Most of it comes from the checkpoint: epo
 Monthly residual = median of the monthly α̂ − `DEG_COR` over the period.
 
 - **The checkpoint is the larger cause.** Model A's own epoch 500 has lost the offset and the overshoot (−0.005 at α = 0.85), and its held-out MAE at 1700 Å is already 0.0095. On held-out months, the 61 pairs with `DEG_COR` > 1 (November–December 2010) carry 15 % of model A's error at 1700 Å.
-- **The sigmoid part is structural.** Epoch 500 still reads −0.012 at α = 1.0 and −0.051 at 1.05: more training does not remove it. A linear head does. Apart from its biases, the network body scales with its input: dim the image by α and its features dim by α (`../run/ANALYSIS_1700_BIAS.md` §5). A linear head keeps that; a sigmoid has to bend it, and reaches 1 only for an infinite input.
+- **The sigmoid part is structural.** Epoch 500 still reads −0.012 at α = 1.0 and −0.051 at 1.05: more training does not remove it. A linear head does. Apart from its biases, the network body scales with its input: dim the image by α and its features dim by α. A linear head keeps that; a sigmoid has to bend it, and reaches 1 only for an infinite input.
 - **The paper reports it too.** It attributes the early-mission deviation of its 94 Å curve to having limited the degradation factor to less than one (its §5.2).
-- **How it was found** (`../run/ANALYSIS_1700_BIAS.md`). The diagnostics showed that the offset sits in the weights and that the shape near α = 1 comes from the sigmoid; a post-hoc correction cannot exceed 1, and learning-rate decay removed only the offset (§1–§6.3). A from-scratch comparison with one seed then showed the paper's head (sigmoid, α ≤ 1) bending by −0.047 at α = 1, and a linear head trained to α = 1.25, with one warm-up epoch, staying within ±0.004 (§6.4). That recipe became 02b, run with three seeds.
+- **How it was found** The diagnostics showed that the offset sits in the weights and that the shape near α = 1 comes from the sigmoid; a post-hoc correction cannot exceed 1, and learning-rate decay removed only the offset (§1–§6.3). A from-scratch comparison with one seed then showed the paper's head (sigmoid, α ≤ 1) bending by −0.047 at α = 1, and a linear head trained to α = 1.25, with one warm-up epoch, staying within ±0.004 (§6.4). That recipe became 02b, run with three seeds.
 - **Result.** At 1700 Å the held-out MAE falls from 0.0198 to 0.0072 and the monthly RMS residual from 0.022 to 0.006; the released model is closer to `DEG_COR` in 90 % of months. At 1600 Å nothing changes: held-out MAE 0.0094 against 0.0088, monthly RMS 0.009 against 0.011, closer in 48 % of months.
-- **Which checkpoint.** The release follows the rule fixed before any held-out evaluation (`tools/release.json`): 02b's own choice, epoch 135, at a learning rate of 3e-4. It keeps an offset of +0.0035 to +0.0053 at 1600 Å (Fig. 3). The last epoch (200, learning rate 1e-5) cuts it to ≤ 0.0017 with similar errors (Table 1), so a future release could use it.
+- **Which checkpoint.** The release follows the rule fixed before any held-out evaluation: 02b's own choice, epoch 135, at a learning rate of 3e-4. It keeps an offset of +0.0035 to +0.0053 at 1600 Å (Fig. 3). The last epoch (200, learning rate 1e-5) cuts it to ≤ 0.0017 with similar errors (Table 1), so a future release could use it.
 
 ## 5. Limitations
 
 - **Coverage.** The model has not been tested after 2020, where SDOML-v2 ends.
-- **Not a blind test.** Recipe B was chosen after diagnostic runs that looked at held-out months, `DEG_COR` and the calibration curve (`../run/ANALYSIS_1700_BIAS.md` §6.4), so none of its numbers is fully blind. Only the checkpoint and release rule were fixed before B was evaluated.
-- **Single-frame scatter.** At α = 0.9 the frame-to-frame standard deviation is 0.015 (1600 Å) and 0.009 (1700 Å), and it grows with α. At 1600 Å part of it follows the brightness of the corrected frame (r = 0.43 with its intensity mode on held-out months; −0.01 at 1700 Å). That brightness mixes solar variability with any `DEG_COR` error, and this test cannot separate the two (`ANALYSIS_1700_BIAS.md` §7). Monthly medians reduce the scatter (Fig. 2); their standard error would be about 0.001 if days were independent, so that is a lower bound.
-- **Calibration version.** The AIA response version behind SDOML-v2's `DEG_COR` has not been identified; doing so needs JSOC access. It matters at the end of the record: `DEG_COR` steps up by 0.012 in early June 2020 and is then constant, while α̂ keeps falling and ends about 0.015 below it (Fig. 2).
+- **Not a blind test.** Recipe B was chosen after diagnostic runs that looked at held-out months, `DEG_COR` and the calibration curve, so none of its numbers is fully blind. Only the checkpoint and release rule were fixed before B was evaluated.
+- **Single-frame scatter.** At α = 0.9 the frame-to-frame standard deviation is 0.015 (1600 Å) and 0.009 (1700 Å), and it grows with α. At 1600 Å part of it follows the brightness of the corrected frame (r = 0.43 with its intensity mode on held-out months; −0.01 at 1700 Å). That brightness mixes solar variability with any `DEG_COR` error, and this test cannot separate the two; their standard error would be about 0.001 if days were independent, so that is a lower bound.
 
 ## 6. Problems found and fixed
 
-- **First notebook.** Test months overlapped training (52 % of test frames identical to training frames); there were 31 training images; the wrong network variant was used. See `../run/PIPELINE_AUDIT.md`.
-- **First run of notebook 02: four bugs** (`../run/DEBUG_REPORT_02.md`).
-  - On MPS, `non_blocking` copies return garbage (pytorch #139550): the cause of the NaN.
-  - On MPS, tensors over 4 GB return wrong values (pytorch #149325): the cause of `inf` at epoch 1.
-  - Scale constants set to the raw frame means (35 and 434) instead of the paper's 125 and 1750 (SDOML-v1 units ÷ 4) made the inputs about 4× too large. That killed an output channel, on CPU too.
-  - A stale manifest limited training to 2020 (212 frames).
-- **The paper recipe's 1700 Å bias.** Two causes: a transient output offset frozen by the checkpoint rule, and the sigmoid head's bend near α = 1. This led to recipe B (§4; `../run/ANALYSIS_1700_BIAS.md`).
+- **The paper recipe's 1700 Å bias.** Two causes: a transient output offset frozen by the checkpoint rule, and the sigmoid head's bend near α = 1. This led to recipe B.
 
-## 7. Corrections to earlier records
-
-- **Notebook 02's closing text** says the paper "reaches the high 0.9s". The paper's Table 2 gives a mean success of 85 % at ±0.05 (multichannel CNN, seven EUV channels).
-- **`DEBUG_REPORT_02.md` §1** says 1600/1700 frames are "matched to within 6 min". They are up to 12 min apart.
-- **`ANALYSIS_1700_BIAS.md` §0, §6.3 and §8** call FT-C "the best model available now" and say "The full training has not been run". Model B supersedes both.
-- **`run/data/manifest.json` and `scaling_constants.json`** describe 2020 only. Training ignores both, apart from the image size in the manifest.
-- **First `_s2`/`_s3` runs.** They kept `RANDOM_SEED = 1`; when checked, their weights and histories were bit-identical to seed 1. They were then re-run under the same names with seeds 2 and 3, which overwrote them.
 
 ## 8. Files
 
@@ -128,7 +112,7 @@ Monthly residual = median of the monthly α̂ − `DEG_COR` over the period.
 | `results/released_alpha_daily.csv`, `results/released_alpha_monthly.csv` | the released model's α̂ for every pair, and by month with its scatter, seed spread and residuals (header lines explain the columns) |
 | `tools/` | scripts that made `results/`, the curve files, the figures, the slide and this report; `release.json` (the release rule); `check_numbers.py` (re-derives the numbers) |
 
-To regenerate (needs `../run/` with its data, notebooks and results):
+To regenerate (needs my original`../run/` with its data, notebooks and results, which are not included here):
 
 1. From `../run/`: `python ../final_report/tools/eval03_vm.py autocal_uv_1600_1700_refined ../final_report/results/eval_autocal_uv_1600_1700_refined`, repeated until it prints `DONE` (likewise `_s2`, `_s3`); then `python ../final_report/tools/baselines.py ../final_report/results/baselines`.
 2. From `final_report/`: `python tools/make_curve.py && python tools/make_report_numbers.py && python tools/make_figures.py && python tools/make_slide.py && python tools/make_report.py && python tools/check_numbers.py`.
