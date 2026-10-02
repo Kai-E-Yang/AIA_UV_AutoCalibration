@@ -1,4 +1,4 @@
-# AIA 1600/1700 Å auto-calibration — final package
+# AIA 1600/1700 Å auto-calibration
 
 A small CNN that estimates the degradation of SDO/AIA's 1600 Å and 1700 Å channels from the images themselves. Model A follows the method of Dos Santos et al. (2021) on SDOML-v2; model B, released here, refines its training recipe.
 
